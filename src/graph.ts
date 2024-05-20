@@ -1,5 +1,4 @@
-import { Node, NodeOptions } from "./models/node.model";
-import { Edge, EdgeOptions } from "./models/edge.model";
+// src/app/line-graph.ts
 
 interface DataPoint {
   time: number;
@@ -11,6 +10,36 @@ interface DrawOptions {
   lineWidth?: number;
   fillColor?: string;
   font?: string;
+  lineDash?: number[];
+  angle?: number; // Angle in degrees for text rotation
+}
+
+interface AxisOptions {
+  fontSize?: number;
+  fontColor?: string;
+  font?: string;
+  xPadding?: number;
+  yPadding?: number;
+  xScale?: {
+    min: number;
+    max: number;
+    step: number;
+    decimalPlaces?: number;
+    showDecimals?: boolean;
+    labelOffset?: number;
+  };
+  yScale?: {
+    min: number;
+    max: number;
+    step: number;
+    decimalPlaces?: number;
+    showDecimals?: boolean;
+    labelOffset?: number;
+  };
+  xLabel?: string;
+  yLabel?: string;
+  xAxisStyle?: DrawOptions;
+  yAxisStyle?: DrawOptions;
 }
 
 class LineGraph {
@@ -20,9 +49,9 @@ class LineGraph {
   private width: number;
   private height: number;
 
-  constructor(canvasId: string, width: number, height: number) {
-    this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
-    this.ctx = this.canvas.getContext("2d")!;
+  constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+    this.canvas = canvas;
+    this.ctx = this.canvas.getContext('2d')!;
     this.width = width;
     this.height = height;
     this.canvas.width = width;
@@ -72,60 +101,130 @@ class LineGraph {
     y: number,
     options: DrawOptions = {},
   ): void {
+    const { color, font, angle } = options;
+    if (angle) {
+      this.ctx.save();
+      this.ctx.translate(x, y);
+      this.ctx.rotate(angle * (Math.PI / 180));
+      this.ctx.fillStyle = color || 'black';
+      this.ctx.font = font || '12px Arial';
+      this.ctx.fillText(text, 0, 0);
+      this.ctx.restore();
+      return;
+    }
     if (options.font) this.ctx.font = options.font;
     if (options.color) this.ctx.fillStyle = options.color;
     this.ctx.fillText(text, x, y);
   }
 
-  drawAxes(): void {
-    const padding = 50;
-    const times = this.data.map((d) => d.time);
-    const elevations = this.data.map((d) => d.elevation);
+  drawAxes(options: AxisOptions = {}): void {
+    const {
+      fontSize = 12,
+      fontColor = 'black',
+      font = 'Arial',
+      xPadding = 50,
+      yPadding = 50,
+      xScale = {
+        min: 0,
+        max: 10,
+        step: 1,
+        decimalPlaces: 0,
+        showDecimals: false,
+        labelOffset: 10,
+      },
+      yScale = {
+        min: 0,
+        max: 10,
+        step: 1,
+        decimalPlaces: 0,
+        showDecimals: false,
+        labelOffset: 10,
+      },
+      xLabel = null,
+      yLabel = null,
+      xAxisStyle = { color: 'black', lineWidth: 1 },
+      yAxisStyle = { color: 'black', lineWidth: 1 },
+    } = options;
 
-    const maxTime = Math.max(...times);
-    const minTime = Math.min(...times);
-    const maxElevation = Math.max(...elevations);
-    const minElevation = Math.min(...elevations);
+    const {
+      min: xMin,
+      max: xMax,
+      step: xStep,
+      decimalPlaces: xDecimalPlaces = 0,
+      showDecimals: xShowDecimals = false,
+      labelOffset: xLabelOffset = 10,
+    } = xScale;
 
-    const timeInterval = (maxTime - minTime) / 10;
-    const elevationInterval = (maxElevation - minElevation) / 10;
+    const {
+      min: yMin,
+      max: yMax,
+      step: yStep,
+      decimalPlaces: yDecimalPlaces = 0,
+      showDecimals: yShowDecimals = false,
+      labelOffset: yLabelOffset = 20,
+    } = yScale;
 
     // Draw X-axis
     this.drawLine(
-      padding,
-      this.height - padding,
-      this.width - padding,
-      this.height - padding,
+      yPadding,
+      this.height - xPadding,
+      this.width - yPadding,
+      this.height - xPadding,
+      xAxisStyle,
     );
-    this.drawText("Time", this.width / 2, this.height - 20, {
-      color: "black",
-      font: "16px Arial",
-    });
-
-    // Draw X-axis labels
-    for (let i = 0; i <= 10; i++) {
-      const x = padding + (i * (this.width - 2 * padding)) / 10;
-      const time = minTime + i * timeInterval;
-      this.drawText(time.toFixed(2), x, this.height - padding + 20, {
-        color: "black",
-        font: "12px Arial",
+    if (xLabel) {
+      this.drawText(xLabel, this.width / 2, this.height - xPadding / 2, {
+        color: fontColor,
+        font: `${fontSize + 4}px ${font}`,
       });
     }
 
-    // Draw Y-axis
-    this.drawLine(padding, padding, padding, this.height - padding);
-    this.drawText("Elevation", 20, this.height / 2, {
-      color: "black",
-      font: "16px Arial",
-    });
+    // Draw X-axis labels and ticks
+    for (let x = xMin; x <= xMax; x += xStep) {
+      const xPos =
+        yPadding + ((x - xMin) / (xMax - xMin)) * (this.width - 2 * yPadding);
+      const label = xShowDecimals
+        ? x.toFixed(xDecimalPlaces)
+        : Math.round(x).toString();
+      this.drawText(
+        label,
+        xPos,
+        this.height - xPadding + fontSize + xLabelOffset,
+        {
+          color: fontColor,
+          font: `${fontSize}px ${font}`,
+        },
+      );
+    }
 
-    // Draw Y-axis labels
-    for (let i = 0; i <= 10; i++) {
-      const y = this.height - padding - (i * (this.height - 2 * padding)) / 10;
-      const elevation = minElevation + i * elevationInterval;
-      this.drawText(elevation.toFixed(2), padding - 40, y + 5, {
-        color: "black",
-        font: "12px Arial",
+    // Draw Y-axis
+    this.drawLine(
+      yPadding,
+      xPadding,
+      yPadding,
+      this.height - xPadding,
+      yAxisStyle,
+    );
+    if (yLabel) {
+      this.drawText(yLabel, yPadding / 2, this.height / 2, {
+        color: fontColor,
+        font: `${fontSize + 4}px ${font}`,
+        angle: -90,
+      });
+    }
+
+    // Draw Y-axis labels and ticks
+    for (let y = yMin; y <= yMax; y += yStep) {
+      const yPos =
+        this.height -
+        xPadding -
+        ((y - yMin) / (yMax - yMin)) * (this.height - 2 * xPadding);
+      const label = yShowDecimals
+        ? y.toFixed(yDecimalPlaces)
+        : Math.round(y).toString();
+      this.drawText(label, yPadding - fontSize - yLabelOffset, yPos + 5, {
+        color: fontColor,
+        font: `${fontSize}px ${font}`,
       });
     }
   }
@@ -150,14 +249,58 @@ class LineGraph {
         padding -
         ((dataPoint.elevation - minElevation) / (maxElevation - minElevation)) *
         (this.height - 2 * padding);
-      this.drawCircle(x, y, 5, { fillColor: "blue" });
+      this.drawCircle(x, y, 5, { fillColor: 'blue' });
     });
   }
 
-  connectDataPoints(): void {
-    const padding = 50;
-    const times = this.data.map((d) => d.time);
-    const elevations = this.data.map((d) => d.elevation);
+  drawVerticalLinesAtPositions(
+    xPositions: number[],
+    text: string,
+    axisOptions: AxisOptions,
+    drawOptions: DrawOptions = {},
+    textOptions: DrawOptions = {},
+    minHeight: number = 0, // Minimum y-coordinate
+    maxHeight: number = this.height, // Maximum y-coordinate
+  ): void {
+    const { xScale, xPadding = 50, yPadding = 50 } = axisOptions;
+    const { min: xMin, max: xMax } = xScale || { min: 0, max: 1 };
+
+    if (xPositions.length !== 2) {
+      console.error('xPositions array must contain exactly two positions');
+      return;
+    }
+
+    const x1 =
+      yPadding +
+      ((xPositions[0] - xMin) / (xMax - xMin)) * (this.width - 2 * yPadding);
+    const x2 =
+      yPadding +
+      ((xPositions[1] - xMin) / (xMax - xMin)) * (this.width - 2 * yPadding);
+
+    // Ensure minHeight and maxHeight are within the canvas bounds
+    minHeight = Math.max(0, minHeight);
+    maxHeight = Math.min(this.height, maxHeight);
+
+    // Draw the vertical lines with the specified min and max heights
+    this.drawLine(x1, minHeight, x1, maxHeight, drawOptions);
+    this.drawLine(x2, minHeight, x2, maxHeight, drawOptions);
+
+    // Calculate the position for the text (midpoint between the two lines)
+    const textX = (x1 + x2) / 2;
+    const textY = maxHeight + (minHeight - maxHeight) / 2; // Centered between min and max heights
+
+    // Draw the text
+    this.drawText(text, textX, textY, textOptions);
+  }
+
+  connectDataPoints(
+    data: DataPoint[],
+    xPadding: number = 50,
+    yPadding: number = 50,
+    options: DrawOptions = {},
+  ): void {
+    const times = data.map((d) => d.time);
+    const elevations = data.map((d) => d.elevation);
 
     const maxTime = Math.max(...times);
     const minTime = Math.min(...times);
@@ -165,25 +308,28 @@ class LineGraph {
     const minElevation = Math.min(...elevations);
 
     this.ctx.beginPath();
-    this.data.forEach((dataPoint, index) => {
+    data.forEach((dataPoint, index) => {
       const x =
-        padding +
+        yPadding +
         ((dataPoint.time - minTime) / (maxTime - minTime)) *
-        (this.width - 2 * padding);
+        (this.width - 2 * yPadding);
       const y =
         this.height -
-        padding -
+        xPadding -
         ((dataPoint.elevation - minElevation) / (maxElevation - minElevation)) *
-        (this.height - 2 * padding);
+        (this.height - 2 * xPadding);
       if (index === 0) {
         this.ctx.moveTo(x, y);
       } else {
         this.ctx.lineTo(x, y);
       }
     });
+    if (options.color) this.ctx.strokeStyle = options.color;
+    if (options.lineWidth) this.ctx.lineWidth = options.lineWidth;
+    if (options.lineDash) this.ctx.setLineDash(options.lineDash);
     this.ctx.stroke();
   }
-
 }
 
-export { LineGraph, DataPoint };
+export { LineGraph, DataPoint, DrawOptions, AxisOptions };
+
