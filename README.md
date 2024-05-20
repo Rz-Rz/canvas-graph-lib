@@ -225,3 +225,92 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 ```
+
+## Angular Setup
+```typescript
+import {
+  Component,
+  OnInit,
+  AfterViewInit,
+  ViewChild,
+  ElementRef,
+  Inject,
+  PLATFORM_ID,
+} from '@angular/core';
+import {
+  LineGraph,
+  DataPoint,
+  DrawOptions,
+  AxisOptions,
+} from '../../line-graph';
+import { isPlatformBrowser } from '@angular/common';
+
+@Component({
+  selector: 'app-canvas',
+  standalone: true,
+  imports: [],
+  templateUrl: './canvas.component.html',
+  styleUrl: './canvas.component.css',
+})
+export class CanvasComponent implements OnInit, AfterViewInit {
+  @ViewChild('canvas', { static: false })
+  canvasElement!: ElementRef<HTMLCanvasElement>;
+
+  private lineGraph!: LineGraph;
+
+  constructor(@Inject(PLATFORM_ID) private platformId: Object) { }
+  ngOnInit(): void { }
+  ngAfterViewInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      const canvas = this.canvasElement.nativeElement;
+      this.lineGraph = new LineGraph(canvas, 800, 500);
+
+      const data: DataPoint[] = [
+        { time: 0, elevation: 0 },
+        { time: 1, elevation: 10 },
+        { time: 2, elevation: 20 },
+        { time: 3, elevation: 15 },
+        { time: 4, elevation: 25 },
+        { time: 5, elevation: 30 },
+        { time: 6, elevation: 20 },
+        { time: 7, elevation: 10 },
+        { time: 8, elevation: 0 },
+      ];
+
+      const trajOptions: DrawOptions = {
+        color: 'red',
+        lineWidth: 1,
+        lineDash: [5, 5],
+      };
+
+      const axisOptions: AxisOptions = {
+        fontSize: 10,
+        fontColor: 'lightgrey',
+        font: 'Verdana',
+        xPadding: 100,
+        yPadding: 50,
+        xScale: { min: 0, max: 30, step: 2 },
+        yScale: { min: 0, max: 5000, step: 500 },
+        yAxisStyle: { color: 'lightgrey', lineWidth: 1 },
+        xAxisStyle: { color: 'lightgrey', lineWidth: 1 },
+        // xLabel: 'Time',
+        // yLabel: 'Elevation',
+      };
+
+      this.lineGraph.drawVerticalLinesAtPositions(
+        [2, 8],
+        'Label',
+        axisOptions,
+        { color: 'yellow', lineWidth: 1 },
+        { color: 'yellow' },
+        800,
+        200,
+      );
+
+      this.lineGraph.drawAxes(axisOptions);
+      // this.lineGraph.plotDataPoints();
+      this.lineGraph.connectDataPoints(data, 100, 50, trajOptions);
+    }
+  }
+}
+```
